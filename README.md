@@ -1,203 +1,129 @@
+# Market Research Platform — NLP con BERT + LoRA Adapters
+
+**Proyecto Fin de Grado (TFG) — Universidad Europea de Madrid, 2025**  
+**Autor:** Liam Wittels Beneish
+
 ---
-base_model: bert-base-uncased
-library_name: peft
+
+## ¿Qué es esto?
+
+Plataforma end-to-end de análisis de texto basada en **BERT (bert-base-uncased)** + **LoRA Adapters** (PEFT). Permite clasificar texto en 3 tareas distintas usando el mismo modelo base con adaptadores intercambiables, sin necesidad de reentrenar BERT completo.
+
+## Demo
+
+![Interfaz Streamlit](https://i.imgur.com/placeholder.png)
+
+Selecciona una tarea, introduce un texto y obtén la predicción con nivel de confianza en tiempo real.
+
 ---
 
-# Model Card for Model ID
+## Resultados
+
+| Clasificador | Precision | Recall | F1-Score |
+|---|---|---|---|
+| Texto generado por IA | 0.87 | 0.86 | 0.86 |
+| Hate Speech (Discurso de odio) | 0.88 | 0.87 | 0.86 |
+| Patrones de depresión | 0.96 | 0.96 | **0.96** |
+
+---
+
+## Arquitectura
+
+```
+bert-base-uncased (base model, frozen)
+        │
+        ├── LoRA Adapter (r=8, α=16) → Clasificador: Texto generado por IA
+        ├── LoRA Adapter (r=8, α=16) → Clasificador: Hate Speech  
+        └── LoRA Adapter (r=8, α=16) → Clasificador: Depresión
+```
+
+**¿Por qué LoRA?** Fine-tuning completo de BERT = ~440MB por tarea. Con LoRA cada adapter pesa pocos MB, comparten el mismo base model y no hay interferencia entre tareas.
+
+**Configuración LoRA:**
+- Rank (r): 8 | Alpha: 16 | Dropout: 0.1
+- Target modules: `query`, `value` (capas de atención)
+- Task: Sequence Classification (SEQ_CLS)
+- Librería: PEFT 0.15.2
+
+---
+
+## Estructura del proyecto
+
+```
+market-research-nlp/
+│
+├── adapters/
+│   ├── depression/
+│   │   ├── adapter_config.json
+│   │   └── adapter_model.safetensors
+│   ├── hate/
+│   │   ├── adapter_config.json
+│   │   └── adapter_model.safetensors
+│   └── generated/
+│       ├── adapter_config.json
+│       └── adapter_model.safetensors
+│
+├── main2.py          # Interfaz Streamlit
+└── README.md
+```
+
+---
+
+## Instalación y uso
+
+### 1. Instalar dependencias
+
+```bash
+pip install streamlit transformers peft torch pandas
+```
+
+### 2. Lanzar la interfaz
+
+```bash
+streamlit run main2.py
+```
+
+### 3. Usar los modelos directamente
+
+```python
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from peft import PeftModel
+
+# Cargar modelo base
+model = AutoModelForSequenceClassification.from_pretrained(
+    "bert-base-uncased", num_labels=2
+)
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+# Cargar adapter (depression / hate / generated)
+model = PeftModel.from_pretrained(model, "./adapters/depression/")
+model.eval()
+
+# Inferencia
+text = "I feel like nothing matters anymore"
+inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+outputs = model(**inputs)
+pred = outputs.logits.argmax(-1).item()
+print("Predicción:", pred)  # 0=non-depression, 1=depressed
+```
+
+---
+
+## Stack tecnológico
+
+| Categoría | Tecnología |
+|---|---|
+| Modelo base | BERT (bert-base-uncased, HuggingFace) |
+| Fine-tuning | LoRA via PEFT |
+| Framework | PyTorch + HuggingFace Transformers |
+| Procesado de datos | Pandas, NumPy, scikit-learn |
+| Interfaz | Streamlit |
+| Entorno de entrenamiento | Google Colab |
 
-<!-- Provide a quick summary of what the model is/does. -->
+---
 
+## Contacto
 
-
-## Model Details
-
-### Model Description
-
-<!-- Provide a longer summary of what this model is. -->
-
-
-
-- **Developed by:** [More Information Needed]
-- **Funded by [optional]:** [More Information Needed]
-- **Shared by [optional]:** [More Information Needed]
-- **Model type:** [More Information Needed]
-- **Language(s) (NLP):** [More Information Needed]
-- **License:** [More Information Needed]
-- **Finetuned from model [optional]:** [More Information Needed]
-
-### Model Sources [optional]
-
-<!-- Provide the basic links for the model. -->
-
-- **Repository:** [More Information Needed]
-- **Paper [optional]:** [More Information Needed]
-- **Demo [optional]:** [More Information Needed]
-
-## Uses
-
-<!-- Address questions around how the model is intended to be used, including the foreseeable users of the model and those affected by the model. -->
-
-### Direct Use
-
-<!-- This section is for the model use without fine-tuning or plugging into a larger ecosystem/app. -->
-
-[More Information Needed]
-
-### Downstream Use [optional]
-
-<!-- This section is for the model use when fine-tuned for a task, or when plugged into a larger ecosystem/app -->
-
-[More Information Needed]
-
-### Out-of-Scope Use
-
-<!-- This section addresses misuse, malicious use, and uses that the model will not work well for. -->
-
-[More Information Needed]
-
-## Bias, Risks, and Limitations
-
-<!-- This section is meant to convey both technical and sociotechnical limitations. -->
-
-[More Information Needed]
-
-### Recommendations
-
-<!-- This section is meant to convey recommendations with respect to the bias, risk, and technical limitations. -->
-
-Users (both direct and downstream) should be made aware of the risks, biases and limitations of the model. More information needed for further recommendations.
-
-## How to Get Started with the Model
-
-Use the code below to get started with the model.
-
-[More Information Needed]
-
-## Training Details
-
-### Training Data
-
-<!-- This should link to a Dataset Card, perhaps with a short stub of information on what the training data is all about as well as documentation related to data pre-processing or additional filtering. -->
-
-[More Information Needed]
-
-### Training Procedure
-
-<!-- This relates heavily to the Technical Specifications. Content here should link to that section when it is relevant to the training procedure. -->
-
-#### Preprocessing [optional]
-
-[More Information Needed]
-
-
-#### Training Hyperparameters
-
-- **Training regime:** [More Information Needed] <!--fp32, fp16 mixed precision, bf16 mixed precision, bf16 non-mixed precision, fp16 non-mixed precision, fp8 mixed precision -->
-
-#### Speeds, Sizes, Times [optional]
-
-<!-- This section provides information about throughput, start/end time, checkpoint size if relevant, etc. -->
-
-[More Information Needed]
-
-## Evaluation
-
-<!-- This section describes the evaluation protocols and provides the results. -->
-
-### Testing Data, Factors & Metrics
-
-#### Testing Data
-
-<!-- This should link to a Dataset Card if possible. -->
-
-[More Information Needed]
-
-#### Factors
-
-<!-- These are the things the evaluation is disaggregating by, e.g., subpopulations or domains. -->
-
-[More Information Needed]
-
-#### Metrics
-
-<!-- These are the evaluation metrics being used, ideally with a description of why. -->
-
-[More Information Needed]
-
-### Results
-
-[More Information Needed]
-
-#### Summary
-
-
-
-## Model Examination [optional]
-
-<!-- Relevant interpretability work for the model goes here -->
-
-[More Information Needed]
-
-## Environmental Impact
-
-<!-- Total emissions (in grams of CO2eq) and additional considerations, such as electricity usage, go here. Edit the suggested text below accordingly -->
-
-Carbon emissions can be estimated using the [Machine Learning Impact calculator](https://mlco2.github.io/impact#compute) presented in [Lacoste et al. (2019)](https://arxiv.org/abs/1910.09700).
-
-- **Hardware Type:** [More Information Needed]
-- **Hours used:** [More Information Needed]
-- **Cloud Provider:** [More Information Needed]
-- **Compute Region:** [More Information Needed]
-- **Carbon Emitted:** [More Information Needed]
-
-## Technical Specifications [optional]
-
-### Model Architecture and Objective
-
-[More Information Needed]
-
-### Compute Infrastructure
-
-[More Information Needed]
-
-#### Hardware
-
-[More Information Needed]
-
-#### Software
-
-[More Information Needed]
-
-## Citation [optional]
-
-<!-- If there is a paper or blog post introducing the model, the APA and Bibtex information for that should go in this section. -->
-
-**BibTeX:**
-
-[More Information Needed]
-
-**APA:**
-
-[More Information Needed]
-
-## Glossary [optional]
-
-<!-- If relevant, include terms and calculations in this section that can help readers understand the model or model card. -->
-
-[More Information Needed]
-
-## More Information [optional]
-
-[More Information Needed]
-
-## Model Card Authors [optional]
-
-[More Information Needed]
-
-## Model Card Contact
-
-[More Information Needed]
-### Framework versions
-
-- PEFT 0.15.2
-- PEFT 0.14.0
+**Liam Wittels Beneish**  
+Ingeniero Informático — Universidad Europea de Madrid  
+[linkedin.com/in/liam-wittels](https://www.linkedin.com/in/liam-wittels/) | wittelsliam@gmail.com
